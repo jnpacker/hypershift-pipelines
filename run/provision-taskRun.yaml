@@ -1,0 +1,29 @@
+---
+# Available parameters:
+#
+# clusterName      = >>REQUIRED<<
+# namespace        = default
+# credential       = >>REQUIRED<<
+# region           = us-west-1
+# nodePoolReplicas = 2
+# instanceType     = t3.large
+
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: hcp1
+  namespace: default
+spec:
+  taskRef:
+    name: aws-hosted-control-plane-provision
+  serviceAccountName: hcp-tekton-bot
+  params:
+    - name: clusterName
+      value: "hcp-test1"
+    - name: namespace
+      # The hcp-tekton-bot role must be authorized for this namespace and bound to the hcp-tekton-bot service account.
+      value: "default"
+    - name: nodePoolReplicas
+      value: "2"
+    - name: credentialSecret
+      value: "my-secret"

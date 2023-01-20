@@ -1,0 +1,30 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: aws-hosted-control-plane-destroy
+spec:
+  params:
+    - name: clusterName
+      type: string
+      description: "the name of the cluster"
+    - name: namespace
+      # The hcp-tekton-bot role must be authorized for this namespace and bound to the hcp-tekton-bot service account.
+      description: "the namespace where the hostedCluster and NodePool resources are located"
+      default: "default"
+    - name: credentialSecret
+      type: string
+      description: "the name of the multicluster engine aws credential secret"
+  steps:
+    - name: destroy-cluster
+      image: quay.io/stolostron/hypershift-operator:4.12
+      script: |
+        # Basic parameter validation
+         if [[ "$(params.clusterName)" == *--* ]]; then
+          echo Invalid cluster name: $(params.clusterName)
+          exit 1
+        fi
+        hypershift destroy cluster aws \
+        --name $(params.clusterName) \
+        --namespace $(params.namespace) \
+        --infra-id $(params.clusterName)-infra \
+        --secret-creds $(params.credentialSecret)

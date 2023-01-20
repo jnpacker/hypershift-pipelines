@@ -1,0 +1,20 @@
+
+# Cluster name = clusterName
+---
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: destroy-phcp2
+  namespace: default
+spec:
+  taskRef:
+    name: aws-hosted-control-plane-destroy
+  serviceAccountName: hcp-tekton-bot
+  params:
+    - name: clusterName
+      value: "hcp-test1"
+    - name: namespace
+      # The hcp-tekton-bot role must be authorized for this namespace and bound to the hcp-tekton-bot service account.
+      value: "default"
+    - name: credentialSecret
+      value: "my-secret"

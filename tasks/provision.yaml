@@ -1,0 +1,145 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: aws-hosted-control-plane-provision
+spec:
+  params:
+    - name: clusterName
+      type: string
+      description: "the name of the cluster"
+    - name: namespace
+      # The hcp-tekton-bot role must be authorized for this namespace and bound to the hcp-tekton-bot service account.
+      description: "the namespace to place the hostedCluster and NodePool resources"
+      default: "default"
+    - name: credentialSecret
+      type: string
+      description: "the name of the multicluster engine aws credential secret"
+    - name: region
+      description: "the aws region where the hosted control plane will reside"
+      default: "us-west-1"
+    - name: nodePoolReplicas
+      description: "the number of nodes to place in the default node pool"
+      default: "2"
+    - name: instanceType
+      description: "the aws instance type to use for the workers"
+      default: "t3.large"
+  steps:
+    - name: provision-cluster
+      image: quay.io/stolostron/hypershift-operator@sha256:f70b8ab5da530dde23313c8a062e3d2c730c6ab3d5aa300243b84a3f337e15e2
+      script: |
+        # Number of nodes:
+        MIN_NODES=0
+        MAX_NODES=6
+        # Basic parameter validation
+         if [[ "$(params.clusterName)" == *--* ]]; then
+          echo Invalid cluster name: $(params.clusterName)
+          exit 1
+        fi
+        if [[ "$(params.nodePoolReplicas)" == *--* ]]; then
+          echo Invalid node pool replicas value: $(params.nodePoolReplicas)
+          exit 1
+        fi
+        if [[ "$(params.nodePoolReplicas)" < "$MIN_NODES" ]] || [[ "$(params.nodePoolReplicas)" > "$MAX_NODES" ]]; then
+          echo "Error, could not deploy the cluster, the nodePoolReplicas value of $(params.nodePoolReplicas) needs to be between $MIN_NODES and $MAX_NODES"
+          exit 1
+        fi
+        hypershift create cluster aws \
+        --name $(params.clusterName) \
+        --namespace $(params.namespace) \
+        --infra-id $(params.clusterName)-infra \
+        --secret-creds $(params.credentialSecret) \
+        --region $(params.region) \
+        --node-pool-replicas $(params.nodePoolReplicas) \
+        --instance-type $(params.instanceType) \
+        --wait
+
+---
+# ServiceAccount for task
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hcp-tekton-bot
+
+---
+# Roles
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hcp-tekton-bot
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["secrets"]
+  verbs: ["create", "patch", "get", "watch", "list", "deletecollection"]
+- apiGroups: ["hypershift.openshift.io"] # "" indicates the core API group
+  resources: ["hostedclusters","nodepools"]
+  verbs: ["create", "patch", "delete", "get", "watch", "list", "deletecollection"]
+
+---
+# Roles
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hcp-tekton-bot-namespaces
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["namespaces"]
+  verbs: ["get", "watch", "list", "patch"]
+  # If you want to be able to create namespaces, use these verbs
+  # verbs: ["create","get", "watch", "list", "patch"]
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hcp-tekton-bot
+subjects:
+- kind: ServiceAccount
+  name: hcp-tekton-bot
+roleRef:
+  kind: Role
+  name: hcp-tekton-bot
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hcp-tekton-bot-namespaces
+subjects:
+- kind: ServiceAccount
+  name: hcp-tekton-bot
+  namespace: default
+roleRef:
+  kind: Role
+  name: hcp-tekton-bot-namespaces
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Roles
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hcp-tekton-bot
+  namespace: kube-public
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["configmaps"]
+  verbs: ["get", "watch", "list"]
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hcp-tekton-bot
+  namespace: kube-public
+subjects:
+- kind: ServiceAccount
+  name: hcp-tekton-bot
+  namespace: default
+roleRef:
+  kind: Role
+  name: hcp-tekton-bot
+  apiGroup: rbac.authorization.k8s.io

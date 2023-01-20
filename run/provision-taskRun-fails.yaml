@@ -1,0 +1,20 @@
+
+# Cluster name = clusterName
+# Region       = us-west-1
+# Credential   = aws4jnp
+# NP Replicas  = nodePoolReplicas
+
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: hcp2-fail
+  namespace: default
+spec:
+  taskRef:
+    name: aws-hosted-control-plane-provision
+  serviceAccountName: hcp-tekton-bot
+  params:
+    - name: clusterName
+      value: "hcp-test2"
+    - name: nodePoolReplicas
+      value: "7"
