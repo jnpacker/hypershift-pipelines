@@ -25,7 +25,7 @@ spec:
       default: "t3.large"
   steps:
     - name: provision-cluster
-      image: quay.io/stolostron/hypershift-operator@sha256:f70b8ab5da530dde23313c8a062e3d2c730c6ab3d5aa300243b84a3f337e15e2
+      image: quay.io/stolostron/hypershift-operator:4.12
       script: |
         # Number of nodes:
         MIN_NODES=0
